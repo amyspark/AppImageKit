@@ -31,8 +31,40 @@ target_include_directories(appimagetool
 # required for appimagetool's signing
 # we're using CMake's functionality directly, since we want to link those statically
 find_package(PkgConfig)
-pkg_check_modules(libgpgme REQUIRED gpgme IMPORTED_TARGET)
-pkg_check_modules(libgcrypt REQUIRED libgcrypt IMPORTED_TARGET)
+pkg_check_modules(libgpgme gpgme IMPORTED_TARGET)
+if (NOT libgpgme_FOUND)
+    # Before ubuntu 20.04 libgpgme didn't have a pkg-config file
+    # so relying on modules is actually a lie
+    # Also prefer static libraries (see below)
+    find_library(libgpgme NAMES libgpgme.a gpgme REQUIRED)
+    find_library(libassuan NAMES libassuan.a assuan REQUIRED)
+    find_library(libgpg_error NAMES libgpg-error.a gpg-error REQUIRED)
+    set(libgpgme_LINK_LIBRARIES "${libgpgme};${libassuan};${libgpg_error}")
+endif()
+pkg_check_modules(libgcrypt libgcrypt IMPORTED_TARGET)
+if (NOT libgcrypt_FOUND)
+    # Before ubuntu 20.04 libgcrypt didn't have a pkg-config file
+    # so relying on modules is actually a lie
+    # Also prefer static libraries (see below)
+    find_library(libgcrypt NAMES libgcrypt.a gcrypt REQUIRED)
+    find_library(libgpg_error NAMES libgpg-error.a gpg-error REQUIRED)
+    set(libgcrypt_LINK_LIBRARIES "${libgcrypt};${libgpg_error}")
+endif()
+
+message(STATUS "gpgme: ${libgpgme_LINK_LIBRARIES}")
+message(STATUS "gcrypt: ${libgcrypt_LINK_LIBRARIES}")
+
+# AMY: CMake (at least on Ubuntu) returns empty data for
+# xxx_STATIC_LINK_LIBRARIES. If that's the case, simulate it with a simple regex
+if (NOT "${libgcrypt_STATIC_LINK_LIBRARIES}")
+    string(REPLACE ".so" ".a" libgcrypt_STATIC_LINK_LIBRARIES "${libgcrypt_LINK_LIBRARIES}")
+endif()
+if (NOT "${libgpgme_STATIC_LINK_LIBRARIES}")
+    string(REPLACE ".so" ".a" libgpgme_STATIC_LINK_LIBRARIES "${libgpgme_LINK_LIBRARIES}")
+endif()
+
+message(STATUS "gpgme: ${libgpgme_STATIC_LINK_LIBRARIES}")
+message(STATUS "gcrypt: ${libgcrypt_STATIC_LINK_LIBRARIES}")
 
 # trick: list libraries on which imported static ones depend on in the PUBLIC section
 # CMake then adds them after the PRIVATE ones in the linker command
@@ -44,8 +76,8 @@ target_link_libraries(appimagetool
     libglib
     libgio
     libzlib
-    PkgConfig::libgcrypt
-    PkgConfig::libgpgme
+    ${libgcrypt_STATIC_LINK_LIBRARIES}
+    ${libgpgme_STATIC_LINK_LIBRARIES}
     xz
 )
 
