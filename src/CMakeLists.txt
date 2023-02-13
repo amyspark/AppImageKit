@@ -89,6 +89,48 @@ target_compile_definitions(appimagetool
     PRIVATE -DENABLE_BINRELOC
 )
 
+include(CheckCSourceCompiles)
+
+if (TARGET libsquashfuse)
+    set(CMAKE_REQUIRED_LIBRARIES libsquashfuse)
+    check_c_source_compiles("
+    #include \"squashfuse_dlopen.h\"
+    int main() { return 0; }
+    " HAS_SQUASHFUSE_DLOPEN)
+    unset(CMAKE_REQUIRED_LIBRARIES)
+
+    if (HAS_SQUASHFUSE_DLOPEN)
+        target_compile_definitions(appimagetool PRIVATE -DHAS_SQUASHFUSE_DLOPEN=1)
+    endif()
+    # Patching system library if needed.
+    get_target_property(libsquashfuse_LIBS libsquashfuse INTERFACE_LINK_LIBRARIES)
+    message(STATUS "libsquashfuse: ${libsquashfuse_LIBS}")
+    string(REPLACE ".so" ".a" libsquashfuse_STATIC_LINK_LIBRARIES "${libsquashfuse_LIBS}")
+    if(NOT HAS_SQUASHFUSE_DLOPEN)
+        # Add libfuseprivate.a since the pkg-config module doesn't include it
+        find_library(libfuseprivate NAMES libfuseprivate.a HINTS "${libsquashfuse_LIBRARY_DIRS}" REQUIRED)
+        find_library(libfuse NAMES libfuse.a HINTS "${libsquashfuse_LIBRARY_DIRS}" REQUIRED)
+        list(APPEND libsquashfuse_STATIC_LINK_LIBRARIES "${libfuseprivate}")
+        list(APPEND libsquashfuse_STATIC_LINK_LIBRARIES "${libfuse}")
+        # Add the compressor libraries too.
+        # Skip the pkg-config lookup because
+        # https://gitlab.kitware.com/cmake/cmake/-/commit/7e4adcac820d90bb431b374a07ee3d0c6cfe3f1f
+        find_library(z NAMES libz.a HINTS "${libsquashfuse_LIBRARY_DIRS}" REQUIRED)
+        list(APPEND libsquashfuse_STATIC_LINK_LIBRARIES "${libz}")
+        find_library(lz4 NAMES liblz4.a HINTS "${libsquashfuse_LIBRARY_DIRS}" REQUIRED)
+        list(APPEND libsquashfuse_STATIC_LINK_LIBRARIES "${lz4}")
+        find_library(zstd NAMES libzstd.a HINTS "${libsquashfuse_LIBRARY_DIRS}" REQUIRED)
+        list(APPEND libsquashfuse_STATIC_LINK_LIBRARIES "${zstd}")
+        find_library(lzo2 NAMES liblzo2.a HINTS "${libsquashfuse_LIBRARY_DIRS}" REQUIRED)
+        list(APPEND libsquashfuse_STATIC_LINK_LIBRARIES "${lzo2}")
+        # Hotpatch appimage to link appropriately.
+        set_property(TARGET libappimage_static PROPERTY CMAKE_POSITION_INDEPENDENT_CODE ON)
+        set_property(TARGET libappimage PROPERTY CMAKE_POSITION_INDEPENDENT_CODE ON)
+    endif()
+    set_target_properties(libsquashfuse PROPERTIES INTERFACE_LINK_LIBRARIES "${libsquashfuse_STATIC_LINK_LIBRARIES}")
+    message(STATUS "libsquashfuse: ${libsquashfuse_STATIC_LINK_LIBRARIES}")
+endif()
+
 target_include_directories(appimagetool
     PUBLIC $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include/>
     INTERFACE $<INSTALL_INTERFACE:include/>

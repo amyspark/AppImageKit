@@ -51,10 +51,12 @@
 #include <appimage/appimage_shared.h>
 #include <hashlib.h>
 
+#ifdef HAS_SQUASHFUSE_DLOPEN
 #ifndef ENABLE_DLOPEN
 #define ENABLE_DLOPEN
 #endif
 #include "squashfuse_dlopen.h"
+#endif
 
 /* Exit status to use when launching an AppImage fails.
  * For applications that assign meanings to exit status codes (e.g. rsync),
@@ -795,7 +797,9 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
+#ifdef HAS_SQUASHFUSE_DLOPEN
     LOAD_LIBRARY; /* exit if libfuse is missing */
+#endif
 
     int dir_fd, res;
 
