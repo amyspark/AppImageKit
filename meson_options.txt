@@ -1,0 +1,4 @@
+option('auxiliary_files_destination', type: 'string', value: 'lib/appimagekit', description: 'Target install directory for mksquashfs')
+option('appimagekit_runtime_enable_setproctitle', type: 'boolean', value: false, description: 'Useful for $TARGET_APPIMAGE; see issue #763')
+option('appimagekit_embed_magic_bytes', type: 'boolean', value: true, description: 'Embed the magic bytes. CAUTION: the magic bytes are a hard requirement for type 2 AppImages! This option should NEVER be used unless you are 100% sure what you are doing here!')
+option('build_number', type: 'string', value: '<local dev build>')
